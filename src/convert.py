@@ -1,12 +1,18 @@
-import supervisely as sly
-import os
-from dataset_tools.convert import unpack_if_archive
-import src.settings as s
-from urllib.parse import unquote, urlparse
-from supervisely.io.fs import get_file_name, get_file_size
-import shutil
+# https://www.kaggle.com/datasets/achrafkhazri/labeled-licence-plates-dataset
 
+import os
+import shutil
+import xml.etree.ElementTree as ET
+from urllib.parse import unquote, urlparse
+
+import supervisely as sly
+from dataset_tools.convert import unpack_if_archive
+from dotenv import load_dotenv
+from supervisely.io.fs import get_file_ext, get_file_name, get_file_size
 from tqdm import tqdm
+
+import src.settings as s
+
 
 def download_dataset(teamfiles_dir: str) -> str:
     """Use it for large datasets to convert them on the instance"""
@@ -69,17 +75,72 @@ def count_files(path, extension):
 def convert_and_upload_supervisely_project(
     api: sly.Api, workspace_id: int, project_name: str
 ) -> sly.ProjectInfo:
-    ### Function should read local dataset and upload it to Supervisely project, then return project info.###
-    raise NotImplementedError("The converter should be implemented manually.")
 
-    # dataset_path = "/local/path/to/your/dataset" # general way
-    # dataset_path = download_dataset(teamfiles_dir) # for large datasets stored on instance
+    # project_name = "Labeled licence plates"
+    dataset_path = "/home/grokhi/rawdata/tunisian-license-plates/dataset"
+    batch_size = 30
+    images_ext = ".jpg"
+    ann_ext = ".xml"
 
-    # ... some code here ...
+    def create_ann(image_path):
+        labels = []
 
-    # sly.logger.info('Deleting temporary app storage files...')
-    # shutil.rmtree(storage_dir)
+        # image_np = sly.imaging.image.read(image_path)[:, :, 0]
+        # img_height = image_np.shape[0]
+        # img_wight = image_np.shape[1]
 
-    # return project
+        file_name = get_file_name(image_path)
+
+        ann_path = os.path.join(data_path, file_name + ann_ext)
+
+        tree = ET.parse(ann_path)
+        root = tree.getroot()
+
+        img_height = int(root.find(".//height").text)
+        img_wight = int(root.find(".//width").text)
+
+        coords_xml = root.findall(".//bndbox")
+        for curr_coord in coords_xml:
+            left = int(curr_coord[0].text)
+            top = int(curr_coord[1].text)
+            right = int(curr_coord[2].text)
+            bottom = int(curr_coord[3].text)
+
+            rect = sly.Rectangle(left=left, top=top, right=right, bottom=bottom)
+            label = sly.Label(rect, obj_class)
+            labels.append(label)
+
+        return sly.Annotation(img_size=(img_height, img_wight), labels=labels)
+
+
+    obj_class = sly.ObjClass("license plate", sly.Rectangle)
+    project = api.project.create(workspace_id, project_name, change_name_if_conflict=True)
+    meta = sly.ProjectMeta(obj_classes=[obj_class])
+    api.project.update_meta(project.id, meta.to_json())
+
+    for ds_name in os.listdir(dataset_path):
+        dataset = api.dataset.create(project.id, ds_name, change_name_if_conflict=True)
+
+        data_path = os.path.join(dataset_path, ds_name)
+
+        images_names = [
+            im_name for im_name in os.listdir(data_path) if get_file_ext(im_name) == images_ext
+        ]
+
+        progress = sly.Progress("Create dataset {}".format(ds_name), len(images_names))
+
+        for images_names_batch in sly.batched(images_names, batch_size=batch_size):
+            img_pathes_batch = [
+                os.path.join(data_path, image_name) for image_name in images_names_batch
+            ]
+
+            img_infos = api.image.upload_paths(dataset.id, images_names_batch, img_pathes_batch)
+            img_ids = [im_info.id for im_info in img_infos]
+
+            anns = [create_ann(image_path) for image_path in img_pathes_batch]
+            api.annotation.upload_anns(img_ids, anns)
+
+            progress.iters_done_report(len(images_names_batch))
+    return project
 
 
