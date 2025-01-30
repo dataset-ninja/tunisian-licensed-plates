@@ -1,6 +1,6 @@
 Dataset **Tunisian Licensed Plates** can be downloaded in [Supervisely format](https://developer.supervisely.com/api-references/supervisely-annotation-json-format):
 
- [Download](https://www.dropbox.com/scl/fi/fzow0hztzrfbsssi9bw7j/tunisian-licensed-plates-DatasetNinja.tar?rlkey=z9d61mwypqjnx8jt1bo2uu2uz&dl=1)
+ [Download](https://assets.supervisely.com/remote/eyJsaW5rIjogImZzOi8vYXNzZXRzLzI4NTFfVHVuaXNpYW4gTGljZW5zZWQgUGxhdGVzL3R1bmlzaWFuLWxpY2Vuc2VkLXBsYXRlcy1EYXRhc2V0TmluamEudGFyIiwgInNpZyI6ICIwTklyMExFVzBQNkhvSnd1aUhrRmtoU1MrbFNRRFRuL0tjZC9ySGsxK1pZPSJ9)
 
 As an alternative, it can be downloaded with *dataset-tools* package:
 ``` bash
